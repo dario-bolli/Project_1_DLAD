@@ -35,13 +35,12 @@ class Visualizer():
         '''
         :param points: point cloud data
                         shape (N, 3)          
-        Task 2: Change this function such that each point
-        is colored depending on its semantic label
+        Task 2: Each point is colored depending on its semantic label
         '''
-        #Normalize colors, (and reverse BGR->RGB?)
-        
+        #Normalize colors
         for i in color_map:
             color_map[i] = np.array(color_map[i])/255
+            color_map[i] = color_map[i][::-1] #BGR to RGB conversion
 
         # declare color as numpy array, N x 3
         color = np.zeros((points.shape[0],3))

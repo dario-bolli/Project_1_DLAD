@@ -14,8 +14,8 @@ def z_rotation(theta):
     Rotation about the -z-axis. 
     (y in cam0 coordinates)
     """
-    c = np.cos(theta)
-    s = np.sin(theta) 
+    c = np.cos(-theta)
+    s = np.sin(-theta) 
 
     Rot = np.array([[c, -s, 0],
                      [s, c, 0],
@@ -32,9 +32,9 @@ def y_rotation(theta):
                      [-s, 0, c]])
     return Rot
 
-#==================================#
+#==============================================#
 # Rigid Body Transformation and Projection tools
-#==================================#
+#==============================================#
 
 def rectification_Cam0toCam2(points):
     points.shape = (3,-1) # vector form
@@ -54,72 +54,59 @@ def coordCam0toVelo(points):
     pointsLidar = T_inv @ homogenous_points
     return pointsLidar[:3,:]
 
-def box_corner_coordinates(objects):
-      
+def box_corner_coordinates(objects, box_to_image2D):
+    """
+    :param dictionarry object with box dimension and location
+           boolean for projection to image or point cloud
+    :return 2D projection or 3D projection array for the 8 corners
+    """
     for i in range(len(objects)):  
-        # extract dimensions of the box
+        # extract the dimensions of the box
         height = objects[i][8]
         width = objects[i][9]
         length = objects[i][10]
         
-        # extract location in camera0 coordinates and project into Velodyne frame
-        CenterBox_lidar = coordCam0toVelo(np.array((objects[i][11], \
-                                          objects[i][12],objects[i][13])))
-    
-        y = [length/2, length/2, -length/2, -length/2, length/2, length/2, -length/2, -length/2]
-        x = [-width/2, width/2, width/2, -width/2,-width/2, width/2, width/2, -width/2]
-        z = [height,height, height, height, 0, 0, 0, 0 ]
-        # Dimensions of box_dim: 3 x 8 i.e. rows (x,y,z) and columns are the corners
-        box_dim = np.vstack([x,y,z])
+        if(box_to_image2D): #conversion of Box to 2D image
+            box_centre= np.array((objects[i][11], objects[i][12],objects[i][13]))
+            box_centre.shape = (3, -1) # coordinates (x,y,z) as rows 
+            # Corners location 3D in cam0 frame
+            x = [length/2, length/2, -length/2, -length/2, length/2, length/2, -length/2, -length/2]
+            y = [-height, -height, -height, -height, 0, 0, 0, 0]
+            z = [width/2, -width/2, -width/2, width/2, width/2, -width/2, -width/2, width/2]
+            # Dimensions of box_dim: 3 x 8 i.e. rows (x,y,z) and columns are the corners
+            box_dim = np.vstack([x,y,z])
+            #rotation around y
+            Rot = y_rotation(objects[i][14])
+ 
+        else: # box to be shown in the point cloud
+            # extract location in Cam0 coordinates and project into Velodyne frame
+            box_centre = coordCam0toVelo(np.array((objects[i][11], \
+                                            objects[i][12],objects[i][13])))
+            # Corners location 3D in velodyne frame
+            y = [length/2, length/2, -length/2, -length/2, length/2, length/2, -length/2, -length/2]
+            x = [-width/2, width/2, width/2, -width/2,-width/2, width/2, width/2, -width/2]
+            z = [height,height, height, height, 0, 0, 0, 0 ]
+            # Dimensions of box_dim: 3 x 8 i.e. rows are (x,y,z) and columns are the corners
+            box_dim = np.vstack([x,y,z])
+            #rotation of axe around -Z
+            Rot = z_rotation(objects[i][14])
 
-        #rotation of axe 
-        Rot = z_rotation(objects[i][14])
-        box_dim = Rot @ box_dim 
-
-        # Center the box around the object location in the Velodyne frame
-        box_dim += CenterBox_lidar
-        box_dim = box_dim.T # coordinates as columns and corner numbers as rows
-      
+        box_dim = Rot @ box_dim
+        # Center the box around the object location
+        box_dim += box_centre
+        
+        if box_to_image2D: # get pixel equivalent coordinates
+            box_dim = rectification_Cam0toCam2(box_dim)
+        else:
+            box_dim = box_dim.T # coordinates as columns and corner numbers as rows
+        
+        # stack up object boxes corners coordinates in a 3_dim array
         if i == 0: # first object
             corners = box_dim 
-        else: # stack up object boxes coordinates in one array
-            corners = np.dstack((box_dim, corners)) # Shape is 8 x 3 x N
-    return np.transpose(corners, (2,0,1)) # correct format for drawing N x 8 x 3
-
-def box_in_cam2(objects):
-
-    img = data['image_2']
-    for i in range(len(objects)):  
-        # extract dimensions of the box
-        height = objects[i][8]
-        width = objects[i][9]
-        length = objects[i][10]
-
-        CenterboxCam0 = np.array((objects[i][11], objects[i][12],objects[i][13]))
-        # Corners location 3D in cam0 frame
-        x = [length/2, length/2, -length/2, -length/2, length/2, length/2, -length/2, -length/2]
-        y = [-height, -height, -height, -height, 0, 0, 0, 0]
-        z = [width/2, -width/2, -width/2, width/2, width/2, -width/2, -width/2, width/2]
-        
-        # Dimensions of box_dim: 3 x 8 i.e. rows (x,y,z) and columns are the corners
-        box_dim = np.vstack([x,y,z])
-
-        #rotation around y
-        Rot = y_rotation(objects[i][14])
-        box_dim = Rot @ box_dim
-
-        CenterboxCam0.shape = (3, -1)
-        box_dim+= CenterboxCam0
-
-        #project to cam2, in pixel coordinates 2 x 8
-        pixel_coord = rectification_Cam0toCam2(box_dim)
-
-        if i == 0: # first object
-            boxPixels = pixel_coord
-        else: # stack up object boxes coordinates in one array
-            boxPixels = np.dstack((pixel_coord, boxPixels)) # Shape is 8 x 2 x N
-            
-    return np.transpose(boxPixels, (2,0,1)) # correct format for drawing N x 8 x 2
+        else: 
+            corners = np.dstack((box_dim, corners)) # Shape is 8 x 3 x N for velodyne
+            # Shape is 8 x 2 x N for image
+    return np.transpose(corners, (2,0,1)) # correct format for drawing N x 8 x (2 or 3)
 
 
 def get_cloud_pixel_coordinates(xyz_velodyne, sem_label, P, T):
@@ -156,11 +143,12 @@ def get_cloud_pixel_coordinates(xyz_velodyne, sem_label, P, T):
     v = v.astype(np.int32)    
     return {'velodyne_fltrd':velodyne_fltrd, 'sem_label_fltrd':sem_label_fltrd, 'u': u, 'v':v}
 
-#==================================#
+#====================================================#
 # Drawing functions
-#==================================#
+#====================================================#
 
-def draw_points_cloud2image(img, u, v, sem_label_fltrd, velodyne_fltrd, color_map):
+def draw_points_cloud2image(img, u, v, sem_label_fltrd, 
+                            velodyne_fltrd, color_map):
     #Draw color point cloud on image
     color=np.zeros(velodyne_fltrd.shape[1])
     for i in range(velodyne_fltrd.shape[1]):
@@ -188,7 +176,8 @@ def draw_box_image(img, pixel_coord):
     for i in range(pixel_coord.shape[0]):
         pixels= (pixel_coord[i,:,:]).astype(np.int32) # get the 8 pixels location 
         for i in range(indice.shape[0]): #connect the corners
-            img = cv2.line(img, (pixels[0,indice[i][0]], pixels[1,indice[i][0]]), (pixels[0,indice[i][1]], pixels[1,indice[i][1]]), green, 2)
+            img = cv2.line(img, (pixels[0,indice[i][0]], pixels[1,indice[i][0]]), \
+                          (pixels[0,indice[i][1]], pixels[1,indice[i][1]]), green, 2)
     return img
 
 
@@ -200,7 +189,7 @@ if __name__ == '__main__':
 
     #======= TASK 2.1 ======================#
     PixelCoord = get_cloud_pixel_coordinates(data['velodyne'][:,0:3], data['sem_label'], data['P_rect_20'], \
-                                       data['T_cam2_velo'])
+                                       data['T_cam0_velo'])
     velodyne_fltrd = PixelCoord['velodyne_fltrd']
     sem_label_fltrd = PixelCoord['sem_label_fltrd']
     u = PixelCoord['u']
@@ -216,7 +205,9 @@ if __name__ == '__main__':
     #======================================#
 
     #======= TASK 2.2 ======================#
-    boxPixels = box_in_cam2(data['objects'])
+    #boxPixels = box_in_cam2(data['objects'])
+    box2image = True
+    boxPixels = box_corner_coordinates(data['objects'], box2image)
     img = draw_box_image(img, boxPixels)
     cv2.imshow('image2',img)
     cv2.waitKey(0)
@@ -226,7 +217,8 @@ if __name__ == '__main__':
     #======= TASK 2.3 ======================#
     v = visual.Visualizer() 
     # Get corner coordinates in Velodyne frame
-    corners = box_corner_coordinates(data['objects']) 
+    box2image = False
+    corners = box_corner_coordinates(data['objects'], box2image) 
     v.update_boxes(corners[:,:,:]) # Draw the boxes in 3D
     v.update(data['velodyne'][:,:3],data['sem_label'], data['color_map']) # Point cloud
     vispy.app.run()
