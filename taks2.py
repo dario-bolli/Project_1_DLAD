@@ -110,7 +110,7 @@ def box_corner_coordinates(objects, box_to_image2D):
 
 
 def get_cloud_pixel_coordinates(xyz_velodyne, sem_label, P, T):
-    """
+    
     #filter points with negative x
     indexes = np.argwhere(xyz_velodyne[:, 0]>=0).flatten()
     velodyne_fltrd = np.zeros((len(indexes), 3))
@@ -118,17 +118,7 @@ def get_cloud_pixel_coordinates(xyz_velodyne, sem_label, P, T):
     for i in range(len(indexes)):
         velodyne_fltrd[i] = xyz_velodyne[indexes[i],:]
         sem_label_fltrd[i] = sem_label[indexes[i]]
-    """   
-    #filter points with negative x
-    velodyne_fltrd = []
-    sem_label_fltrd = []
-    for i in range(xyz_velodyne.shape[0]):
-        if xyz_velodyne[i, 0] >= 0:
-            velodyne_fltrd.append(xyz_velodyne[i, :])
-            sem_label_fltrd.append(sem_label[i])
-    velodyne_fltrd = np.array(velodyne_fltrd)
-    sem_label_fltrd = np.array(sem_label_fltrd)
-    
+  
     #Projection of point cloud in image 2 coordinates
     a = np.ones((velodyne_fltrd.shape[0],1))
     velodyne_fltrd = np.hstack((velodyne_fltrd, a))
@@ -152,7 +142,7 @@ def draw_points_cloud2image(img, u, v, sem_label_fltrd,
     #Draw color point cloud on image
     color=np.zeros(velodyne_fltrd.shape[1])
     for i in range(velodyne_fltrd.shape[1]):
-        label=sem_label_fltrd[i][0]
+        label=sem_label_fltrd[i]
         color = color_map.get(label)
         # Draw a circle of corresponding color 
         cv2.circle(img,(u[i],v[i]), 1, color, -1)  
@@ -184,7 +174,7 @@ def draw_box_image(img, pixel_coord):
 if __name__ == '__main__':
     
     dirname = os.path.dirname(os.path.abspath('Task2'))
-    data_path = os.path.join(dirname,'data', 'demo.p')
+    data_path = os.path.join(dirname,'data', 'data.p')
     data = load_data(data_path) # Change to data.p for your final submission 
 
     #======= TASK 2.1 ======================#
