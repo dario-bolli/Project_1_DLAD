@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 import os
 from load_data import load_data
 import cv2 
+import data_utils as du
 
 
 dirname = os.path.dirname(os.path.abspath('Ex1'))
@@ -42,16 +43,14 @@ for i in range(xyz_velodyne.shape[0]):
 color_map = {1: [0, 0, 255], 2:[255,0,0], 3:[0,255,0], 4:[30, 30, 255]}#division par 4 avec reste
 
 
-#cône (360 deg)avec 0,4 deg de différences d'ouverture
-#distance au cone le plus proche en x,y,z (sphère autour du point?)
-
 #filter points with negative x
-velodyne_fltrd = []
-laser_id_fltrd = []
-for i in range(xyz_velodyne.shape[0]):
-    if xyz_velodyne[i, 0] >= 0:
-        velodyne_fltrd.append(xyz_velodyne[i, :])
-        laser_id_fltrd.append(laser_id[i])
+indexes = np.argwhere(xyz_velodyne[:, 0]>=0).flatten()
+velodyne_fltrd = np.zeros((len(indexes), 3))
+laser_id_fltrd = np.zeros(len(indexes))
+for i in range(len(indexes)):
+    velodyne_fltrd[i] = xyz_velodyne[indexes[i],:]
+    laser_id_fltrd[i] = laser_id[indexes[i]]
+
 velodyne_fltrd = np.array(velodyne_fltrd)
 laser_id_fltrd = np.array(laser_id_fltrd)
 
@@ -70,14 +69,16 @@ v = v.astype(np.int32)
 
 #Draw laser ID color of the point cloud on image
 img = image2.astype(np.uint8)
-img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+#img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 color=np.zeros(velodyne_fltrd.shape[1])
 for i in range(velodyne_fltrd.shape[1]):
     label=laser_id_fltrd[i]
-    label = label%4
-    color = color_map.get(label)
+    #label = label%4
+    #color = color_map.get(label)
+    color[i] = du.line_color(label)
     # Draw a circle of corresponding color 
-    cv2.circle(img,(u[i],v[i]), 1, color, -1)
+    #cv2.circle(img,(u[i],v[i]), 1, color, -1)
+img = du.print_projection_plt(proj_cloud, color,img)
 cv2.imshow('image2',img)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
