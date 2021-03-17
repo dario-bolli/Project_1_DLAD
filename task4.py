@@ -57,7 +57,7 @@ def getCorrected_pointCloud(point_cloud, delta_t, vel, ang):
         # Rigid Body transformation in homogeneous coordinates
         homg_coordinates= np.hstack((point_cloud[j,:], 1))
         pointCloud_corrected[j,:] = np.matmul(homg_coordinates, M_p[:,:,j]) 
-    
+    print(M_p[:,:,point_cloud.shape[0]-20])
     return pointCloud_corrected[:,:3]
 ## --------------------------------------------------------------------------##
 
@@ -77,7 +77,7 @@ time_start = 'data/problem_4/velodyne_points/timestamps_start.txt'
 time_camera = 'data/problem_4/velodyne_points/timestamps.txt'
 time_end = 'data/problem_4/velodyne_points/timestamps_end.txt'
 # Velodyne .bin to extract and project to the corresponding image
-num_bin = 37 
+num_bin = 37
 file_index = str(num_bin)
 str_0 = (10-len(file_index))*"0"
 data_path = os.path.join('data/problem_4/oxts/data/', str_0 + file_index+ '.txt')
@@ -147,7 +147,9 @@ ind_start_point = int(np.argwhere(indices == start_point))
 indices_1 = indices[ind_start_point:]
 indices_2 = indices[0:ind_start_point]
 indices = np.append(indices_1 ,indices_2)
-
+print(indices)
+indices = indices[::-1]
+print(indices)
 ## Point cloud velodyne sorted in scan order
 point_cloud = point_cloud[indices,:]
 
@@ -156,12 +158,17 @@ point_cloud = point_cloud[indices,:]
 delta_t = (lidar_start-lidar_end)/point_cloud.shape[0]
 # Corrected point Cloud i.e. Distorsion taken into account
 pointCloud_corrected = getCorrected_pointCloud(point_cloud, delta_t, vel, ang)
-
+point_diff = pointCloud_corrected-point_cloud
 ## Project corrected point cloud on image ##
 imgloc = "data/problem_4/image_02/data/0000000037.png"
 img = cv2.imread(imgloc)
 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-img_proj = printCloud2image(pointCloud_corrected, img)
-cv2.imshow('Projection on image',img_proj)
+point_cloud_not_corrected = data_utils.load_from_bin(data_velodyne)
+img_proj_not_corrected = printCloud2image(point_cloud_not_corrected, img)
+cv2.imshow('Projection on image not corrected',img_proj_not_corrected)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+img_proj_corrected = printCloud2image(pointCloud_corrected, img)
+cv2.imshow('Projection on image corrected',img_proj_corrected)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
