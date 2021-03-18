@@ -4,7 +4,7 @@ import os
 from load_data import load_data
 from PIL import Image
 
-data = load_data('data/demo.p') #load data
+data = load_data('data/data.p') #load data
 # extract data
 x_velodyne =  data['velodyne'][:,0]
 y_velodyne = data['velodyne'][:,1]
@@ -31,4 +31,5 @@ for i in range(1, pixel_intens.size):
     
 # Convert from numpy array to a PIL image
 im = Image.fromarray(im)
+im.save("Bird_Eye_View.png")
 im.show()
