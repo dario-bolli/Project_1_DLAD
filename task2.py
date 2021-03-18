@@ -189,17 +189,18 @@ if __name__ == '__main__':
     img = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
     img = draw_points_cloud2image(img, PixelCoord['u'], PixelCoord['v'], \
                                   PixelCoord['sem_label_fltrd'], PixelCoord['velodyne_fltrd'], data['color_map'])
-    cv2.imshow('image2',img)
+    cv2.imwrite("Task_2_1.png", img)
+    cv2.imshow('Cam2 image',img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
     #======================================#
 
     #======= TASK 2.2 ======================#
-    #boxPixels = box_in_cam2(data['objects'])
     box2image = True
     boxPixels = box_corner_coordinates(data['objects'], box2image)
     img = draw_box_image(img, boxPixels)
-    cv2.imshow('image2',img)
+    cv2.imwrite("Task_2_2.png", img) #save to current directory
+    cv2.imshow('Cam2 image with boxes',img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
     #======================================#
