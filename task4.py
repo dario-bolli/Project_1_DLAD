@@ -10,29 +10,33 @@ import os
 ## --------------------------------------------------------------------------##
 
 def printCloud2image(xyz_velodyne, img):
+    """
+    :param point cloud and current image
+    From velo -> cam0 -> img coordinates of cam2
+    :return image with colored projected points on it in function of their depth
+    """
     R, T = data_utils.calib_velo2cam('data/problem_4/calib_velo_to_cam.txt')
+    # Get Extrinsic Transformation matrix from velo to cam (homogeneous coordinates)
     Trans_matrix = np.hstack((R,T))
-    # Get Extrinsic Transformation matrix from velo to cam
     Trans_matrix = np.vstack((Trans_matrix,np.array([0, 0, 0, 1])))
-    velodyne_fltrd = []
-    # Filter point cloud for positive x only 
-    for i in range(xyz_velodyne.shape[0]):
-        if xyz_velodyne[i, 0] >= 0:
-            velodyne_fltrd.append(xyz_velodyne[i, :])
-    velodyne_fltrd = np.array(velodyne_fltrd)
-    # To homogeneous coordinates 
-    velodyne_fltrd_inter = np.hstack((velodyne_fltrd, np.ones((velodyne_fltrd.shape[0],1))))
-    velodyne_fltrd = np.transpose(velodyne_fltrd_inter)
-    # From velo -> cam -> img coordinates
-    extrin_calib = np.matmul(Trans_matrix,velodyne_fltrd)
-    intrins_calib = data_utils.calib_cam2cam("data/problem_4/calib_cam_to_cam.txt", '02')
-    proj_cloud = np.matmul(intrins_calib,extrin_calib)/extrin_calib[2,:] #normalization by Zc
 
-    #compute depth
-    depth = np.sqrt(velodyne_fltrd[0,:]**2 + velodyne_fltrd[1,:]**2)
-    #r_proj = np.sqrt(velodyne_fltrd[0,:]**2 + velodyne_fltrd[1,:]**2)
-    #depth = np.sqrt(r_proj**2 + velodyne_fltrd[3,:]**2)
-    color=data_utils.depth_color(depth)
+    velodyne_homogeneous = np.hstack((xyz_velodyne, np.ones((xyz_velodyne.shape[0],1))))
+    # indices as columns and 3D coordinates as rows
+    velodyne_homogeneous = np.transpose(velodyne_homogeneous)
+    # To cam0 coordinate frame
+    extrin_calib = np.matmul(Trans_matrix,velodyne_homogeneous)
+    # filter points with negative z in Cam0 coordinates
+    indexes = np.argwhere(extrin_calib[2,:]>=0).flatten()
+    extrin_calib_fltrd = extrin_calib[:, indexes]
+    #compute depth estimation: sqrt(x^2 + z^2) in Cam0 frame
+    depth = np.sqrt(extrin_calib_fltrd[0,:]**2 + extrin_calib_fltrd[2,:]**2)
+    
+    # Project on camera 2
+    intrins_calib = data_utils.calib_cam2cam("data/problem_4/calib_cam_to_cam.txt", '02')
+    proj_cloud = np.matmul(intrins_calib,extrin_calib_fltrd)/extrin_calib_fltrd[2,:] #normalization by Zc
+
+    #color points in function of their depth and print velodyne points on cam2 image
+    color=data_utils.depth_color(depth, np.amin(depth), np.amax(depth))
     img = data_utils.print_projection_plt(proj_cloud, color, img)
     return img
 
@@ -99,6 +103,7 @@ def getSorted_PointCloud(point_cloud, angle_start_velo):
     indices_orderOfScan = np.append(indices_1 ,indices_2)
     indice_CameraTrigger = len(indices_sorted[start_point_x:])
 
+    
     return point_cloud[indices_orderOfScan,:], indice_CameraTrigger
         
 ## --------------------------------------------------------------------------##
@@ -120,7 +125,7 @@ time_camera = 'data/problem_4/image_02/timestamps.txt'
 time_end = 'data/problem_4/velodyne_points/timestamps_end.txt'
 
 # Current Velodyne .bin to extract and project to the corresponding image
-num_bin = 319
+num_bin = 37
 file_index = str(num_bin)
 str_0 = (10-len(file_index))*"0"
 data_path = os.path.join('data/problem_4/oxts/data/', str_0 + file_index+ '.txt')
@@ -175,7 +180,7 @@ homogenous_points = np.vstack((pointCloud_corrected,np.ones((1,pointCloud_correc
 pointCloud_corrected = Trans_matrix@homogenous_points
 pointCloud_corrected = np.transpose(pointCloud_corrected[:3,:])
 
-imgloc = "data/problem_4/image_02/data/0000000319.png"
+imgloc = "data/problem_4/image_02/data/0000000037.png"
 img = cv2.imread(imgloc)
 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 # corrected image
