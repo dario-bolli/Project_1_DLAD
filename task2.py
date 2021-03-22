@@ -19,11 +19,13 @@ def z_rotation(theta):
 
     Rot = np.array([[c, -s, 0],
                      [s, c, 0],
-                     [0, 0, 1]])
-                     
+                     [0, 0, 1]])              
     return Rot
 
 def y_rotation(theta):
+    """
+    Rotation about the y-axis in Cam0 coord.
+    """
     c = np.cos(theta)
     s = np.sin(theta)
 
@@ -83,8 +85,8 @@ def box_corner_coordinates(objects, box_to_image2D):
             box_centre = coordCam0toVelo(np.array((objects[i][11], \
                                             objects[i][12],objects[i][13])))
             # Corners location 3D in velodyne frame
-            y = [length/2, length/2, -length/2, -length/2, length/2, length/2, -length/2, -length/2]
             x = [-width/2, width/2, width/2, -width/2,-width/2, width/2, width/2, -width/2]
+            y = [length/2, length/2, -length/2, -length/2, length/2, length/2, -length/2, -length/2]
             z = [height,height, height, height, 0, 0, 0, 0 ]
             # Dimensions of box_dim: 3 x 8 i.e. rows are (x,y,z) and columns are the corners
             box_dim = np.vstack([x,y,z])
@@ -110,28 +112,36 @@ def box_corner_coordinates(objects, box_to_image2D):
 
 
 def get_cloud_pixel_coordinates(xyz_velodyne, sem_label, P, T):
-    
-    #filter points with negative x
-    indexes = np.argwhere(xyz_velodyne[:, 0]>=0).flatten()
-    velodyne_fltrd = np.zeros((len(indexes), 3))
+    """
+    :param point cloud coordinates (x,y,z)
+           semantic labels of these points
+           Extrinsic transformation matrix T and intrinsic transformation matrix P
+    :return pixel indices u and v of corresponding point cloud as dictionary
+    """
+    # To homogeneous
+    ones_array = np.ones((xyz_velodyne.shape[0],1))
+    xyz_velodyne = np.hstack((xyz_velodyne, ones_array))
+
+    # x,y,z as rows, point indexes as columns 
+    xyz_velodyne = np.transpose(xyz_velodyne)
+    extrin_calib = np.matmul(T,xyz_velodyne)
+
+    # filter points with negative z in Cam0 coordinate frame
+    indexes = np.argwhere(extrin_calib[2,:]>=0).flatten()
+
+    #filter points with negative z
     sem_label_fltrd = np.zeros(len(indexes))
+    extrin_calib_fltrd = np.zeros((4, len(indexes)))
     for i in range(len(indexes)):
-        velodyne_fltrd[i] = xyz_velodyne[indexes[i],:]
+        extrin_calib_fltrd[:,i] = extrin_calib[:,indexes[i]]
         sem_label_fltrd[i] = sem_label[indexes[i]]
   
     #Projection of point cloud in image 2 coordinates
-    a = np.ones((velodyne_fltrd.shape[0],1))
-    velodyne_fltrd = np.hstack((velodyne_fltrd, a))
-    velodyne_fltrd = np.transpose(velodyne_fltrd)
-
-    extrin_calib = np.matmul(T,velodyne_fltrd)
-    proj_cloud = np.matmul(P,extrin_calib)/extrin_calib[2,:] #normalization by Zc
-
+    proj_cloud = np.matmul(P,extrin_calib_fltrd)/extrin_calib_fltrd[2,:] #normalization by Zc
     u,v,k = proj_cloud   #k is an array of ones
-
     u = u.astype(np.int32)
     v = v.astype(np.int32)    
-    return {'velodyne_fltrd':velodyne_fltrd, 'sem_label_fltrd':sem_label_fltrd, 'u': u, 'v':v}
+    return {'velodyne_fltrd':extrin_calib_fltrd, 'sem_label_fltrd':sem_label_fltrd, 'u': u, 'v':v}
 
 #====================================================#
 # Drawing functions
@@ -139,6 +149,9 @@ def get_cloud_pixel_coordinates(xyz_velodyne, sem_label, P, T):
 
 def draw_points_cloud2image(img, u, v, sem_label_fltrd, 
                             velodyne_fltrd, color_map):
+    """
+    Draw points as circle on image of camera 2
+    """
     #Draw color point cloud on image
     color=np.zeros(velodyne_fltrd.shape[1])
     for i in range(velodyne_fltrd.shape[1]):
@@ -175,20 +188,17 @@ if __name__ == '__main__':
     
     dirname = os.path.dirname(os.path.abspath('Task2'))
     data_path = os.path.join(dirname,'data', 'data.p')
-    data = load_data(data_path) # Change to data.p for your final submission 
+    data = load_data(data_path) 
 
     #======= TASK 2.1 ======================#
-    PixelCoord = get_cloud_pixel_coordinates(data['velodyne'][:,0:3], data['sem_label'], data['P_rect_20'], \
-                                       data['T_cam0_velo'])
-    velodyne_fltrd = PixelCoord['velodyne_fltrd']
-    sem_label_fltrd = PixelCoord['sem_label_fltrd']
-    u = PixelCoord['u']
-    v = PixelCoord['v']
+    PixelCoord = get_cloud_pixel_coordinates(data['velodyne'][:,0:3], data['sem_label'], \
+                                             data['P_rect_20'], data['T_cam0_velo'])
     #Draw color point cloud on image    
     image2 = data['image_2'].astype(np.uint8)
     img = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
     img = draw_points_cloud2image(img, PixelCoord['u'], PixelCoord['v'], \
-                                  PixelCoord['sem_label_fltrd'], PixelCoord['velodyne_fltrd'], data['color_map'])
+                                  PixelCoord['sem_label_fltrd'], PixelCoord['velodyne_fltrd'], \
+                                  data['color_map'])
     cv2.imwrite("Task_2_1.png", img)
     cv2.imshow('Cam2 image',img)
     cv2.waitKey(0)
@@ -196,7 +206,7 @@ if __name__ == '__main__':
     #======================================#
 
     #======= TASK 2.2 ======================#
-    box2image = True
+    box2image = True # project boxes on camera 2
     boxPixels = box_corner_coordinates(data['objects'], box2image)
     img = draw_box_image(img, boxPixels)
     cv2.imwrite("Task_2_2.png", img) #save to current directory
@@ -208,7 +218,7 @@ if __name__ == '__main__':
     #======= TASK 2.3 ======================#
     v = visual.Visualizer() 
     # Get corner coordinates in Velodyne frame
-    box2image = False
+    box2image = False 
     corners = box_corner_coordinates(data['objects'], box2image) 
     v.update_boxes(corners[:,:,:]) # Draw the boxes in 3D
     v.update(data['velodyne'][:,:3],data['sem_label'], data['color_map']) # Point cloud
