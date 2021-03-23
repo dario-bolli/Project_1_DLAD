@@ -167,6 +167,15 @@ def draw_box_image(img, pixel_coord):
     N: number of boxes
     8: corners
     2: u, v
+    
+          1 -------- 0
+         /|         /|
+        2 -------- 3 .
+        | |        | |
+        . 5 -------- 4
+        |/         |/
+        6 -------- 7
+
     """
     # Order of drawing (connect points as in 3dVision update boxes)
     indice = np.asarray([[0,1],[0,3],[0,4],
