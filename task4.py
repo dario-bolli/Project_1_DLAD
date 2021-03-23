@@ -142,7 +142,7 @@ time_camera = 'data/problem_4/image_02/timestamps.txt'
 time_end = 'data/problem_4/velodyne_points/timestamps_end.txt'
 
 #-!!!!---------- Velodyne Bin number and image number -----------!!!!-#
-binAndImage_file = 37 # Change HERE 
+binAndImage_file = 312 # Change HERE 
 #-!!!!-----------------------------------------------------------!!!!-#
 
 file_index = str(binAndImage_file)
@@ -206,8 +206,12 @@ img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 img_proj_no_corr = printCloud2image(velodyne, img)
 cv2.imshow('Direct projection WITHOUT removing motion distorsion',img_proj_no_corr)
 #--------------corrected image-------------------#
-img_proj = printCloud2image(pointCloud_corrected, img)
-cv2.imshow('Projection after MOTION DISTORSION REMOVED',img_proj)
+img_proj_corrected = printCloud2image(pointCloud_corrected, img)
+cv2.imshow('Projection after MOTION DISTORSION REMOVED',img_proj_corrected)
+# save image with corrected projection 
+filename = 'Task4_motion_distorsion_removed_image_' + file_index + '.png'
+cv2.imwrite(filename, img_proj_corrected)
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
+#------------------------------------------------------------------------------------------------#
