@@ -50,7 +50,7 @@ class Visualizer():
             label=sem_label[i][0].astype(np.uint8)
             color[i,:] = color_map.get(label)
         # Plot point cloud with colors
-        self.sem_vis.set_data(points, size=3, face_color = color)
+        self.sem_vis.set_data(points, size=3, edge_width=0.75, face_color = color)
     
     def update_boxes(self, corners):
         '''
