@@ -41,11 +41,19 @@ def printCloud2image(xyz_velodyne, img):
     return img
 
 def getCorrected_pointCloud(point_cloud, delta_t, vel, ang, trigger_cam):
-    M_p = np.zeros((4,4,point_cloud.shape[1]))
+    """
+    :param point cloud, time intervall between each point in the velodyne scan,
+           velocity and angular interpolation
+           time where image is taken on camera2
+    :return corrected velodyne points without distorsion effect
+    """
+    M_p = np.zeros((4,4,point_cloud.shape[1])) # Rigid Body Transformation Matrix
     pointCloud_corrected = np.zeros((4, point_cloud.shape[1]))
     homogeneous = np.array([0,0,0,1]) # to homogeneous coordinates
+
+    #------ Velodyne points taken BEFORE the image trigger on camera 2-------#
     for j in range(0,trigger_cam):
-    #Compute translation using angular velocity and velocity
+        #Compute translation using angular velocity and velocity
         pos_xy_p = -vel[0:2]*(trigger_cam-j)*delta_t
         #Compute rotation using pos and angular velocity
         theta_p = -ang[2]*(trigger_cam-j)*delta_t
@@ -60,7 +68,11 @@ def getCorrected_pointCloud(point_cloud, delta_t, vel, ang, trigger_cam):
         M_p[:,:,j] = np.vstack((R_T, homogeneous))
         # Rigid Body transformation in homogeneous coordinates
         homg_coordinates= np.hstack((point_cloud[:,j], 1))
+        # Remove distorsion
         pointCloud_corrected[:,j] = np.matmul(M_p[:,:,j], homg_coordinates) 
+    #-------------------------------------------------------------------------#
+
+    #------ Velodyne points taken AFTER the image trigger on camera 2---------#
     for j in range(trigger_cam, point_cloud.shape[1]):
         #Compute translation using angular velocity and velocity
         pos_xy_p = vel[0:2]*(j-trigger_cam)*delta_t
@@ -77,14 +89,21 @@ def getCorrected_pointCloud(point_cloud, delta_t, vel, ang, trigger_cam):
         M_p[:,:,j] = np.vstack((R_T, homogeneous))
         # Rigid Body transformation in homogeneous coordinates
         homg_coordinates= np.hstack((point_cloud[:,j], 1))
+        # Remove distorsion
         pointCloud_corrected[:,j] = np.matmul(M_p[:,:,j], homg_coordinates) 
         
     return pointCloud_corrected[:3,:]
 
 
 def getSorted_PointCloud(point_cloud, angle_start_velo):
-    
+    """
+    :param velodyne point cloud, starting scan angle of velodyne
+    :returns: velodyne point cloud sorted in an ascending order from the starting horizontal 
+              angle at timestamp_start to the end of the scan at timestart_end       
+    """
     alpha = np.zeros(point_cloud.shape[0])
+    #--- compute alpha angle i.e. azimuthal angle in the x, y plane ---#
+    #----------- Sorted by ascending azimuthal angle ------------------#
     for j in range(point_cloud.shape[0]):
         hyp = np.sqrt(point_cloud[j,0]**2+point_cloud[j,1]**2)
         alpha[j] = np.arcsin(point_cloud[j,1]/hyp)
@@ -93,21 +112,22 @@ def getSorted_PointCloud(point_cloud, angle_start_velo):
             alpha[j] = alpha[j] + np.pi
         if alpha[j] < 0:
             alpha[j] = 2*np.pi + alpha[j]
-
+    # Ascending azimuthal angle in clockwise direction (liDAR scan direction)
     indices_sorted = np.argsort(2*np.pi-alpha) # in the clockwise direction
     alpha_sorted = np.sort(2*np.pi-alpha)
-
-    start_point_x = int(min(np.argwhere(alpha_sorted >= angle_start_velo))) # same as in indices_sorted
+    # Find point cloud index where the velodyne scan starts #
+    start_point_x = int(min(np.argwhere(alpha_sorted >= angle_start_velo))) 
     indices_1 = indices_sorted[start_point_x:]
     indices_2 = indices_sorted[0:start_point_x-1]
+    # Array of indices in the LiDAR scan order (velodyne start angle -> end angle)
     indices_orderOfScan = np.append(indices_1 ,indices_2)
-    indice_CameraTrigger = len(indices_sorted[start_point_x:])
-
+    # Point cloud index associated to where camera2 triggers
+    index_CameraTrigger = len(indices_sorted[start_point_x:])
     
-    return point_cloud[indices_orderOfScan,:], indice_CameraTrigger
+    return point_cloud[indices_orderOfScan,:], index_CameraTrigger
         
 ## --------------------------------------------------------------------------##
-
+##---------------------------------------------------------------------------##
 
 
 ##--------------------MAIN PROGRAM-------------------------------------------##
@@ -116,23 +136,24 @@ dirname = os.path.dirname(os.path.abspath('Task4'))
 data_path = os.path.join(dirname,'data', 'demo.p')
 data = load_data(data_path)
 
-M = np.zeros((4,4))
-
-
 #----------Timestamps Paths--------------------------------------#
 time_start = 'data/problem_4/velodyne_points/timestamps_start.txt'
 time_camera = 'data/problem_4/image_02/timestamps.txt'
 time_end = 'data/problem_4/velodyne_points/timestamps_end.txt'
 
-# Current Velodyne .bin to extract and project to the corresponding image
-num_bin = 37
-file_index = str(num_bin)
+#-!!!!---------- Velodyne Bin number and image number -----------!!!!-#
+binAndImage_file = 37 # Change HERE 
+#-!!!!-----------------------------------------------------------!!!!-#
+
+file_index = str(binAndImage_file)
 str_0 = (10-len(file_index))*"0"
 data_path = os.path.join('data/problem_4/oxts/data/', str_0 + file_index+ '.txt')
+imgloc = os.path.join('data/problem_4/image_02/data/', str_0 + file_index+ '.png')
+
 # Get timestamps in seconds
-lidar_start = data_utils.compute_timestamps(time_start, num_bin)
-trigger_camera = data_utils.compute_timestamps(time_camera, num_bin)
-lidar_end = data_utils.compute_timestamps(time_end, num_bin)
+lidar_start = data_utils.compute_timestamps(time_start, binAndImage_file )
+trigger_camera = data_utils.compute_timestamps(time_camera, binAndImage_file )
+lidar_end = data_utils.compute_timestamps(time_end,binAndImage_file )
 
 # Get GPS velocity and angular velocity
 vel = data_utils.load_oxts_velocity(data_path)
@@ -150,44 +171,43 @@ ang_no_corr = w_velodyne*(trigger_camera-lidar_start)
 angle_start_velo = ang_no_corr + theta
         
 ### Extract Velodyne points ###
-file_index = str(num_bin)
+file_index = str(binAndImage_file)
 str_0 = (10-len(file_index))*"0"
 data_velodyne = os.path.join('data/problem_4/velodyne_points/data/', str_0 + file_index+ '.bin')
 point_cloud = data_utils.load_from_bin(data_velodyne)
 velodyne = data_utils.load_from_bin(data_velodyne)
 
-###-- Sort the velodyne points --###
-point_cloud, indice_CameraTrigger = getSorted_PointCloud(point_cloud, angle_start_velo)
+#----------- Sort the velodyne points -----------------------------------------------#
+point_cloud, index_CameraTrigger = getSorted_PointCloud(point_cloud, angle_start_velo)
 
-## Transform Lidar points to IMU coordinates
+#-----------------Transform Lidar points to IMU coordinates--------------------------#
 R, T = data_utils.calib_imu2velo('data/problem_4/calib_imu_to_velo.txt')
 Trans_matrix = np.hstack((R,T))
 Trans_matrix = np.vstack((Trans_matrix,np.array([0, 0, 0, 1])))
-#Inverse Transformation matrix
-Trans_matrix_inv = np.linalg.inv(Trans_matrix)
+Trans_matrix_inv = np.linalg.inv(Trans_matrix)#Inverse Transformation matrix
 homogenous_points = np.hstack((point_cloud, np.ones((point_cloud.shape[0],1))))
-
 point_cloud = Trans_matrix_inv@np.transpose(homogenous_points)
 
-## Compute rectification matrices for each point by linear interpolation
-# Delta time between each point in the scan
-delta_t = (lidar_end-lidar_start)/point_cloud.shape[1]
-# Corrected point Cloud i.e. Distorsion taken into account
-pointCloud_corrected = getCorrected_pointCloud(point_cloud[:3,:], delta_t, vel, ang, indice_CameraTrigger)
+#--------Compute rectification matrices for each point by linear interpolation-------#
+delta_t = (lidar_end-lidar_start)/point_cloud.shape[1] # Delta time between each point in the scan
+#--------Corrected point Cloud i.e. distorsion removed-------------------------------#
+pointCloud_corrected = getCorrected_pointCloud(point_cloud[:3,:], delta_t, vel, ang, index_CameraTrigger)
 
 #Apply Transformation imu2velo
 homogenous_points = np.vstack((pointCloud_corrected,np.ones((1,pointCloud_corrected.shape[1]))))
 pointCloud_corrected = Trans_matrix@homogenous_points
 pointCloud_corrected = np.transpose(pointCloud_corrected[:3,:])
+#----------------------------------------------------------------------------#
 
-imgloc = "data/problem_4/image_02/data/0000000037.png"
+#------------Print Corrected Point Cloud on Camera 2 image---------------------------------------#
 img = cv2.imread(imgloc)
 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-# corrected image
-img_proj = printCloud2image(pointCloud_corrected, img)
-# non corrected image
+#----------- non corrected image-----------------#
 img_proj_no_corr = printCloud2image(velodyne, img)
-cv2.imshow('Projection on image',img_proj)
-cv2.imshow('Projection non corrected',img_proj_no_corr)
+cv2.imshow('Direct projection WITHOUT removing motion distorsion',img_proj_no_corr)
+#--------------corrected image-------------------#
+img_proj = printCloud2image(pointCloud_corrected, img)
+cv2.imshow('Projection after MOTION DISTORSION REMOVED',img_proj)
+
 cv2.waitKey(0)
 cv2.destroyAllWindows()
