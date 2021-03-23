@@ -138,11 +138,11 @@ data = load_data(data_path)
 
 #----------Timestamps Paths--------------------------------------#
 time_start = 'data/problem_4/velodyne_points/timestamps_start.txt'
-time_camera = 'data/problem_4/image_02/timestamps.txt'
+time_camera = 'data/problem_4/velodyne_points/timestamps.txt'
 time_end = 'data/problem_4/velodyne_points/timestamps_end.txt'
 
 #-!!!!---------- Velodyne Bin number and image number -----------!!!!-#
-binAndImage_file = 312 # Change HERE 
+binAndImage_file = 37 # Change HERE 
 #-!!!!-----------------------------------------------------------!!!!-#
 
 file_index = str(binAndImage_file)
