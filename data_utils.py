@@ -1,7 +1,6 @@
 # Deep Learning for Autonomous Driving
-# Material for the 3rd and 4th problem of Project 1
-# For further questions contact Dengxin Dai (dai@vision.ee.ethz.ch) or Ozan Unal (ouenal@ee.ethz.ch)
-
+# Material for the 3rd and 4th Problems of Project 1
+# For further questions contact Dengxin Dai, dai@vision.ee.ethz.ch
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
@@ -23,8 +22,6 @@ def depth_color(val, min_d=0, max_d=120):
     print Color(HSV's H value) corresponding to distance(m)
     close distance = red , far distance = blue
     """
-    max_d = np.amax(val)
-    min_d = np.amin(val)
     np.clip(val, 0, max_d, out=val)  # max distance is 120m but usually not usual
     return (((val - min_d) / (max_d - min_d)) * 120).astype(np.uint8)
 
@@ -36,23 +33,7 @@ def line_color(val, min_d=1, max_d=64):
     alter_num = 4
     return (((val - min_d)%alter_num) * 127/alter_num).astype(np.uint8)
 
-def calib_imu2velo(filepath):
-    """
-    get Rotation(R : 3x3), Translation(T : 3x1) matrix info
-    using R,T matrix, we can convert velodyne coordinates to camera coordinates
-    """
-    with open(filepath, "r") as f:
-        file = f.readlines()
 
-        for line in file:
-            (key, val) = line.split(':', 1)
-            if key == 'R':
-                R = np.fromstring(val, sep=' ')
-                R = R.reshape(3, 3)
-            if key == 'T':
-                T = np.fromstring(val, sep=' ')
-                T = T.reshape(3, 1)
-    return R, T
 
 
 def calib_velo2cam(filepath):
@@ -132,7 +113,7 @@ def print_projection_plt(points, color, image):
     hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
     for i in range(points.shape[1]):
-        cv2.circle(hsv_image, (np.int32(points[0][i]), np.int32(points[1][i])), 1, (int(color[i]), 255, 255), -1)
+        cv2.circle(hsv_image, (np.int32(points[0][i]), np.int32(points[1][i])), 2, (int(color[i]), 255, 255), -1)
 
     return cv2.cvtColor(hsv_image, cv2.COLOR_HSV2RGB)
 
@@ -170,4 +151,3 @@ def load_oxts_angular_rate(oxts_f):
         angular_rate_l = data[0][21]
         angular_rate_u = data[0][22]
     return angular_rate_f, angular_rate_l, angular_rate_u
-
