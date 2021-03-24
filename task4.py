@@ -8,6 +8,23 @@ import os
 
 ## ------------------------FUNCTIONS-----------------------------------------##
 ## --------------------------------------------------------------------------##
+def calib_imu2velo(filepath):
+    """
+    get Rotation(R : 3x3), Translation(T : 3x1) matrix info
+    using R,T matrix, we can convert velodyne coordinates to camera coordinates
+    """
+    with open(filepath, "r") as f:
+        file = f.readlines()
+
+        for line in file:
+            (key, val) = line.split(':', 1)
+            if key == 'R':
+                R = np.fromstring(val, sep=' ')
+                R = R.reshape(3, 3)
+            if key == 'T':
+                T = np.fromstring(val, sep=' ')
+                T = T.reshape(3, 1)
+    return R, T
 
 def printCloud2image(xyz_velodyne, img):
     """
@@ -142,7 +159,7 @@ time_camera = 'data/problem_4/velodyne_points/timestamps.txt'
 time_end = 'data/problem_4/velodyne_points/timestamps_end.txt'
 
 #-!!!!---------- Velodyne Bin number and image number -----------!!!!-#
-binAndImage_file = 37 # Change HERE 
+binAndImage_file = 312 # Change HERE 
 #-!!!!-----------------------------------------------------------!!!!-#
 
 file_index = str(binAndImage_file)
@@ -181,7 +198,7 @@ velodyne = data_utils.load_from_bin(data_velodyne)
 point_cloud, index_CameraTrigger = getSorted_PointCloud(point_cloud, angle_start_velo)
 
 #-----------------Transform Lidar points to IMU coordinates--------------------------#
-R, T = data_utils.calib_imu2velo('data/problem_4/calib_imu_to_velo.txt')
+R, T = calib_imu2velo('data/problem_4/calib_imu_to_velo.txt')
 Trans_matrix = np.hstack((R,T))
 Trans_matrix = np.vstack((Trans_matrix,np.array([0, 0, 0, 1])))
 Trans_matrix_inv = np.linalg.inv(Trans_matrix)#Inverse Transformation matrix
